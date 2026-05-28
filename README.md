@@ -43,7 +43,8 @@ For using a packaged release:
 
 - Windows 10 or newer.
 - Forza Horizon 6 installed locally.
-- Optional but recommended: VB-CABLE, Hi-Fi Cable, or another virtual audio cable for routing one app into the bridge.
+- Optional but recommended: [HiFiCableAsioBridge](https://vb-audio.com/Cable/#DownloadASIOBridge) or another virtual audio cable for routing one app into the bridge. 
+- Optional but recommended: [AuRo](https://chromewebstore.google.com/detail/auro-audio-output-device/hglnindfakmbhhkldompfjeknfapaceh) - A Chrome Extension to pick an audio output device for HTML5 audio and video elements 
 
 For building from source:
 
