@@ -1552,19 +1552,23 @@ DWORD WINAPI InjectorThread(LPVOID parameter)
         fh6rb::LogWarn("FMOD DSP injector: failed to parse Forza PE image.");
         return 0;
     }
-    if (std::find(kSupportedForzaExeSizes.begin(), kSupportedForzaExeSizes.end(), image.size) ==
-        kSupportedForzaExeSizes.end())
-    {
-        std::ostringstream sizes;
-        for (size_t i = 0; i < kSupportedForzaExeSizes.size(); ++i)
-        {
-            if (i) sizes << ",";
-            sizes << kSupportedForzaExeSizes[i];
-        }
-        fh6rb::LogWarn("FMOD DSP injector: unsupported Forza image size=" + std::to_string(image.size) +
-            " supportedSizes=[" + sizes.str() + "]");
-        return 0;
-    }
+	const bool knownForzaImageSize =
+		std::find(kSupportedForzaExeSizes.begin(), kSupportedForzaExeSizes.end(), image.size) !=
+		kSupportedForzaExeSizes.end();
+
+	if (!knownForzaImageSize)
+	{
+		std::ostringstream sizes;
+		for (size_t i = 0; i < kSupportedForzaExeSizes.size(); ++i)
+		{
+			if (i) sizes << ",";
+			sizes << kSupportedForzaExeSizes[i];
+		}
+
+		fh6rb::LogWarn("FMOD DSP injector: unrecognized Forza image size=" + std::to_string(image.size) +
+			" knownSizes=[" + sizes.str() + "]; continuing with sigscan anyway. "
+			"If FMOD signatures or RadioStreamFmod discovery fail, the injector will stay dormant.");
+	}
 
     DspRuntime runtime;
     if (!ResolveFmodFunctions(image, runtime.functions))
