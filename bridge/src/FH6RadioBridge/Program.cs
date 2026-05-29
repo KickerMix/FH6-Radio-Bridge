@@ -52,7 +52,7 @@ try
         writer.WriteSamples(samples, sampleCount);
     });
     var metadata = MetadataState.Unknown();
-    await using var metadataService = new MediaSessionMetadataService(metadata);
+    await using var metadataService = new MediaSessionMetadataService(metadata, config);
     if (config.Metadata.UseWindowsMediaSession)
     {
         await metadataService.StartAsync(cts.Token);

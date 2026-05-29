@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 let config = null;
 let saving = false;
+let mediaSessionsSaving = false;
 
 const api = async (url, options = {}) => {
   const res = await fetch(url, { headers: { 'content-type': 'application/json' }, ...options });
@@ -15,6 +16,16 @@ function updateEqVisibility(enabled) {
   const eqControls = $('eqControls');
   if (!eqControls) return;
   eqControls.classList.toggle('hidden', !enabled);
+}
+
+function updateMediaSessionControls(selection) {
+  const auto = $('mediaSessionAuto');
+  const select = $('mediaSessionSelect');
+  if (!auto || !select || !selection) return;
+
+  const isAuto = String(selection.selectionMode ?? 'Auto').toLowerCase() === 'auto';
+  auto.checked = isAuto;
+  select.disabled = isAuto;
 }
 
 async function loadConfig() {
@@ -38,6 +49,53 @@ async function savePatch(patch) {
     config = await api('/api/config', { method: 'PUT', body: JSON.stringify(patch) });
   } finally {
     saving = false;
+  }
+}
+
+async function refreshMediaSessions() {
+  const target = $('mediaSessionTarget');
+  const select = $('mediaSessionSelect');
+  const auto = $('mediaSessionAuto');
+  const count = $('mediaSessionCount');
+  if (!target || !select || !auto) return;
+
+  try {
+    const response = await api('/api/media-sessions');
+    const sessions = response.sessions ?? [];
+    const isAuto = String(response.selectionMode ?? 'Auto').toLowerCase() === 'auto';
+
+    select.innerHTML = '';
+    let selectedText = isAuto ? 'Auto-select best playing session' : 'Manual selection';
+
+    for (const session of sessions) {
+      const option = document.createElement('option');
+      option.value = session.sourceAppUserModelId;
+      option.textContent = `${session.sourceAppUserModelId} — ${session.playbackStatus} — ${session.artist} - ${session.title}`;
+      option.selected = Boolean(session.isSelected);
+      select.appendChild(option);
+
+      if (session.isSelected) {
+        selectedText = option.textContent;
+      }
+    }
+
+    if (sessions.length === 0) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'No Windows media sessions found';
+      select.appendChild(option);
+      selectedText = 'No session';
+    }
+
+    target.textContent = selectedText;
+    if (count) count.textContent = `${sessions.length} session(s)`;
+    if (!mediaSessionsSaving) {
+      auto.checked = isAuto;
+      select.disabled = isAuto || sessions.length === 0;
+    }
+  } catch (error) {
+    target.textContent = `Unavailable: ${error.message}`;
+    if (count) count.textContent = '—';
   }
 }
 
@@ -88,6 +146,40 @@ function wireEvents() {
   $('volume').addEventListener('input', (e) => { $('volumeOut').value = Number(e.target.value).toFixed(2); });
   $('volume').addEventListener('change', (e) => savePatch({ audio: { volume: Number(e.target.value) } }));
 
+  $('refreshMediaSessions')?.addEventListener('click', () => refreshMediaSessions().catch(console.error));
+  $('mediaSessionAuto')?.addEventListener('change', async (e) => {
+    mediaSessionsSaving = true;
+    try {
+      if (e.target.checked) {
+        await api('/api/media-sessions/auto', { method: 'POST' });
+      } else {
+        const selected = $('mediaSessionSelect')?.value;
+        if (selected) {
+          await api('/api/media-sessions/select', {
+            method: 'POST',
+            body: JSON.stringify({ sourceAppUserModelId: selected })
+          });
+        }
+      }
+      await refreshMediaSessions();
+    } finally {
+      mediaSessionsSaving = false;
+    }
+  });
+  $('mediaSessionSelect')?.addEventListener('change', async (e) => {
+    if (!e.target.value) return;
+    mediaSessionsSaving = true;
+    try {
+      await api('/api/media-sessions/select', {
+        method: 'POST',
+        body: JSON.stringify({ sourceAppUserModelId: e.target.value })
+      });
+      await refreshMediaSessions();
+    } finally {
+      mediaSessionsSaving = false;
+    }
+  });
+
   for (const slider of document.querySelectorAll('.eqBand')) {
     slider.addEventListener('input', (e) => { e.target.nextElementSibling.value = fmtDb(e.target.value); });
     slider.addEventListener('change', (e) => savePatch({ dsp: { [e.target.dataset.key]: Number(e.target.value) } }));
@@ -97,5 +189,7 @@ function wireEvents() {
 loadConfig().catch(console.error).finally(() => {
   wireEvents();
   refreshState();
+  refreshMediaSessions().catch(console.error);
   setInterval(refreshState, 1000);
+  setInterval(() => refreshMediaSessions().catch(console.error), 3000);
 });

@@ -24,6 +24,7 @@ public sealed class LocalApiServer : IAsyncDisposable
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
     };
 
+    private static readonly TimeSpan QuickStationSkipDebounce = TimeSpan.FromMilliseconds(1200);
     private readonly WebApplication _app;
     private readonly AppConfig _config;
     private readonly SharedAudioWriter _writer;
@@ -31,6 +32,8 @@ public sealed class LocalApiServer : IAsyncDisposable
     private readonly MetadataState _metadata;
     private readonly MediaSessionMetadataService _metadataService;
     private readonly string _captureDeviceName;
+    private readonly object _quickStationSkipLock = new();
+    private DateTimeOffset _lastQuickStationSkipAt = DateTimeOffset.MinValue;
 
     public LocalApiServer(
         AppConfig config,
@@ -47,9 +50,12 @@ public sealed class LocalApiServer : IAsyncDisposable
         _metadataService = metadataService;
         _captureDeviceName = captureDeviceName;
 
+        var appBase = AppContext.BaseDirectory;
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
-            Args = []
+            Args = [],
+            ContentRootPath = appBase,
+            WebRootPath = Path.Combine(appBase, "wwwroot")
         });
         builder.Logging.ClearProviders();
         builder.Services.ConfigureHttpJsonOptions(options =>
@@ -81,6 +87,9 @@ public sealed class LocalApiServer : IAsyncDisposable
         app.MapGet("/api/config", GetConfig);
         app.MapPut("/api/config", async (HttpContext context) => await UpdateConfigAsync(context));
         app.MapGet("/api/metadata", () => Json(_metadata.Current));
+        app.MapGet("/api/media-sessions", async () => Json(await _metadataService.GetSessionsAsync()));
+        app.MapPost("/api/media-sessions/select", async (HttpContext context) => await SelectMediaSessionAsync(context));
+        app.MapPost("/api/media-sessions/auto", () => SetMediaSessionAuto());
         app.MapPost("/api/settings/volume", async (HttpContext context) => await SetVolumeAsync(context));
         app.MapPost("/api/control/playpause", async () => Json(await _metadataService.TryPlayPauseAsync()));
         app.MapPost("/api/control/next", async () => Json(await _metadataService.TryNextAsync()));
@@ -165,6 +174,19 @@ public sealed class LocalApiServer : IAsyncDisposable
                 {
                     _config.Audio.UseLimiter = useLimiter;
                     Log.Warn("useLimiter changes are saved, but the current writer applies them after Bridge restart.");
+                }
+            }
+
+            if (request.Metadata is not null)
+            {
+                if (request.Metadata.SessionSelectionMode is MediaSessionSelectionMode sessionSelectionMode)
+                {
+                    _config.Metadata.SessionSelectionMode = sessionSelectionMode;
+                }
+
+                if (request.Metadata.PreferredSourceAppUserModelId is string preferredSourceAppUserModelId)
+                {
+                    _config.Metadata.PreferredSourceAppUserModelId = preferredSourceAppUserModelId.Trim();
                 }
             }
 
@@ -256,6 +278,43 @@ public sealed class LocalApiServer : IAsyncDisposable
         }
     }
 
+    private async Task<IResult> SelectMediaSessionAsync(HttpContext context)
+    {
+        try
+        {
+            var request = await JsonSerializer.DeserializeAsync<MediaSessionSelectRequest>(
+                context.Request.Body,
+                JsonOptions,
+                context.RequestAborted);
+
+            if (request is null || string.IsNullOrWhiteSpace(request.SourceAppUserModelId))
+            {
+                return Results.BadRequest(new { error = "Expected JSON body with sourceAppUserModelId." });
+            }
+
+            _config.Metadata.SessionSelectionMode = MediaSessionSelectionMode.Manual;
+            _config.Metadata.PreferredSourceAppUserModelId = request.SourceAppUserModelId.Trim();
+            _config.Save();
+
+            Log.Info($"Media session manually selected: {_config.Metadata.PreferredSourceAppUserModelId}");
+            return Json(await _metadataService.GetSessionsAsync());
+        }
+        catch (JsonException)
+        {
+            return Results.BadRequest(new { error = "Invalid JSON." });
+        }
+    }
+
+    private IResult SetMediaSessionAuto()
+    {
+        _config.Metadata.SessionSelectionMode = MediaSessionSelectionMode.Auto;
+        _config.Metadata.PreferredSourceAppUserModelId = string.Empty;
+        _config.Save();
+
+        Log.Info("Media session selection set to Auto.");
+        return GetConfig();
+    }
+
     private async Task<IResult> HandleHookEventAsync(HttpContext context)
     {
         try
@@ -287,6 +346,17 @@ public sealed class LocalApiServer : IAsyncDisposable
                 if (!_config.PlaybackAutomation.QuickStationSkip)
                 {
                     return Json(new { handled = false, reason = "Quick station skip is disabled." });
+                }
+
+                var now = DateTimeOffset.UtcNow;
+                lock (_quickStationSkipLock)
+                {
+                    if (now - _lastQuickStationSkipAt < QuickStationSkipDebounce)
+                    {
+                        return Json(new { handled = false, reason = "Quick station skip debounced." });
+                    }
+
+                    _lastQuickStationSkipAt = now;
                 }
 
                 var result = await _metadataService.TryNextAsync();
@@ -351,8 +421,20 @@ public sealed class LocalApiServer : IAsyncDisposable
     private sealed class ConfigUpdateRequest
     {
         public AudioUpdateRequest? Audio { get; set; }
+        public MetadataUpdateRequest? Metadata { get; set; }
         public PlaybackAutomationUpdateRequest? PlaybackAutomation { get; set; }
         public DspUpdateRequest? Dsp { get; set; }
+    }
+
+    private sealed class MetadataUpdateRequest
+    {
+        public MediaSessionSelectionMode? SessionSelectionMode { get; set; }
+        public string? PreferredSourceAppUserModelId { get; set; }
+    }
+
+    private sealed class MediaSessionSelectRequest
+    {
+        public string SourceAppUserModelId { get; set; } = string.Empty;
     }
 
     private sealed class AudioUpdateRequest

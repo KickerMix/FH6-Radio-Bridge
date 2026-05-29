@@ -7,7 +7,7 @@ namespace FH6RadioBridge.Config;
 
 public sealed class AppConfig
 {
-    public const int CurrentConfigVersion = 3;
+    public const int CurrentConfigVersion = 4;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -129,7 +129,16 @@ public sealed class AppConfig
 
             PlaybackAutomation ??= new PlaybackAutomationConfig();
             Dsp ??= new DspConfig();
-            ConfigVersion = CurrentConfigVersion;
+            ConfigVersion = 3;
+            changed = true;
+        }
+
+        if (ConfigVersion < 4)
+        {
+            Metadata ??= new MetadataConfig();
+            Metadata.SessionSelectionMode = MediaSessionSelectionMode.Auto;
+            Metadata.PreferredSourceAppUserModelId ??= string.Empty;
+            ConfigVersion = 4;
             changed = true;
         }
 
@@ -177,6 +186,16 @@ public sealed class ApiConfig
 public sealed class MetadataConfig
 {
     public bool UseWindowsMediaSession { get; set; } = true;
+
+    public MediaSessionSelectionMode SessionSelectionMode { get; set; } = MediaSessionSelectionMode.Auto;
+
+    public string PreferredSourceAppUserModelId { get; set; } = string.Empty;
+}
+
+public enum MediaSessionSelectionMode
+{
+    Auto,
+    Manual
 }
 
 public sealed class HookConfig

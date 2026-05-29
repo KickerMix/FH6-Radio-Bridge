@@ -8,14 +8,14 @@
 </head>
 <body>
   <main class="shell">
-    <header class="hero">
+    <section class="hero">
       <div>
         <p class="eyebrow">FH6 Bridge Mode</p>
         <h1>Live Radio Dashboard</h1>
         <p class="muted">Producer-side controls for audio, automation, and diagnostics.</p>
       </div>
       <div id="connection" class="pill offline">offline</div>
-    </header>
+    </section>
 
     <section class="grid">
       <article class="card wide">
@@ -26,10 +26,10 @@
           <div id="source" class="muted small">Unknown source</div>
         </div>
         <div class="controls">
-          <button data-control="previous">Previous</button>
-          <button data-control="playpause">Play / Pause</button>
-          <button data-control="next">Next</button>
-          <button data-control="restart">Restart</button>
+          <button type="button" data-control="previous">Previous</button>
+          <button type="button" data-control="playpause">Play / Pause</button>
+          <button type="button" data-control="next">Next</button>
+          <button type="button" data-control="restart">Restart</button>
         </div>
       </article>
 
@@ -45,6 +45,26 @@
         </dl>
       </article>
 
+      <article class="card wide">
+        <h2>Media Session Target</h2>
+        <p class="muted small">
+          Song titles and media controls come from the selected Windows media session.
+        </p>
+        <dl class="status compact">
+          <dt>Current target</dt><dd id="mediaSessionTarget">—</dd>
+          <dt>Detected</dt><dd id="mediaSessionCount">—</dd>
+        </dl>
+        <label class="switch">
+          <input type="checkbox" id="mediaSessionAuto">
+          <span>Auto-select best playing session</span>
+        </label>
+        <label class="field">
+          <span>Manual session</span>
+          <select id="mediaSessionSelect"></select>
+        </label>
+        <button type="button" id="refreshMediaSessions">Refresh sessions</button>
+      </article>
+
       <article class="card">
         <h2>Automation</h2>
         <label class="field">
@@ -56,8 +76,9 @@
           </select>
         </label>
         <p class="muted small">Hook sends race/station events; Bridge decides whether to act.</p>
+		<span>Next song action</span>
         <label class="switch">
-          <input id="quickStationSkip" type="checkbox">
+          <input type="checkbox" id="quickStationSkip">
           <span>Next song hook</span>
         </label>
         <p class="muted small">Change station quickly and switch back within 1 second to skip the song.</p>
@@ -66,20 +87,24 @@
       <article class="card wide">
         <h2>Audio processing</h2>
         <label class="switch">
-          <input id="loudnessNormalization" type="checkbox">
+          <input type="checkbox" id="loudnessNormalization">
           <span>Loudness normalization</span>
         </label>
-        <label class="slider"><span>Output volume</span><input id="volume" type="range" min="0" max="2" step="0.01"><output id="volumeOut">1.00</output></label>
+        <label class="slider">
+          <span>Output volume</span>
+          <input type="range" id="volume" min="0" max="2" step="0.01" value="1">
+          <output id="volumeOut">1.00</output>
+        </label>
         <label class="switch">
-          <input id="equalizerEnabled" type="checkbox">
+          <input type="checkbox" id="equalizerEnabled">
           <span>5-band equalizer</span>
         </label>
         <div id="eqControls" class="eq hidden">
-          <label><span>60 Hz</span><input class="eqBand" data-key="eq60Hz" type="range" min="-6" max="6" step="0.1"><output></output></label>
-          <label><span>250 Hz</span><input class="eqBand" data-key="eq250Hz" type="range" min="-6" max="6" step="0.1"><output></output></label>
-          <label><span>1 kHz</span><input class="eqBand" data-key="eq1kHz" type="range" min="-6" max="6" step="0.1"><output></output></label>
-          <label><span>4 kHz</span><input class="eqBand" data-key="eq4kHz" type="range" min="-6" max="6" step="0.1"><output></output></label>
-          <label><span>12 kHz</span><input class="eqBand" data-key="eq12kHz" type="range" min="-6" max="6" step="0.1"><output></output></label>
+          <label>60 Hz<input class="eqBand" data-key="eq60Hz" type="range" min="-6" max="6" step="0.1"><output>0.0 dB</output></label>
+          <label>250 Hz<input class="eqBand" data-key="eq250Hz" type="range" min="-6" max="6" step="0.1"><output>0.0 dB</output></label>
+          <label>1 kHz<input class="eqBand" data-key="eq1kHz" type="range" min="-6" max="6" step="0.1"><output>0.0 dB</output></label>
+          <label>4 kHz<input class="eqBand" data-key="eq4kHz" type="range" min="-6" max="6" step="0.1"><output>0.0 dB</output></label>
+          <label>12 kHz<input class="eqBand" data-key="eq12kHz" type="range" min="-6" max="6" step="0.1"><output>0.0 dB</output></label>
         </div>
       </article>
     </section>
