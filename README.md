@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> This repository is no longer maintained and will not receive further updates.
+>
+> All functionality from this project has been moved, adapted, and integrated into:
+> https://github.com/g0ldyy/fh6-universal-radio
+>
+> Please use `fh6-universal-radio` for future updates, fixes, and development.
+
 # FH6 Radio Bridge
 
 FH6 Radio Bridge routes audio that is already playing on your Windows PC into the Forza Horizon 6 radio path.
